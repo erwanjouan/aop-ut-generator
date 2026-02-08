@@ -11,4 +11,12 @@ public class SampleRepository {
         log.info("Do Something");
     }
 
+    public Long returnSomeThing() {
+        return 1L;
+    }
+
+    public void throwsSomeException() throws Exception {
+        throw new Exception("Some Exception");
+    }
+
 }

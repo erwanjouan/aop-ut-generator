@@ -16,4 +16,12 @@ public class SampleService {
         sampleRepository.doSomething();
     }
 
+    public Long doSomethingElse() throws Exception {
+        Long l = sampleRepository.returnSomeThing();
+        if(l == 2L){
+            sampleRepository.throwsSomeException();
+        }
+        return l;
+    }
+
 }

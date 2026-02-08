@@ -11,6 +11,7 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
+import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -44,8 +45,17 @@ public class TestMethodInputParamsGenerator {
             case CHAR:
                 initializer = new CharLiteralExpr((String) inputParamValue);
                 break;
+            case INT:
+                initializer = new IntegerLiteralExpr((int) inputParamValue);
+                break;
+            case LONG:
+                initializer = new LongLiteralExpr((Long) inputParamValue);
+                break;
+            case DOUBLE:
+                initializer = new DoubleLiteralExpr((Double) inputParamValue);
+                break;
             default:
-                initializer = new IntegerLiteralExpr((String) inputParamValue); // Covers byte, short, int, long, float, double
+                initializer = new CharLiteralExpr((String) inputParamValue); // Covers byte, short, int, long, float, double
                 break;
         }
         final String argName = parameter.getNameAsString();
@@ -62,6 +72,9 @@ public class TestMethodInputParamsGenerator {
         final String argName = parameter.getNameAsString();
         if (StaticJavaParser.parseClassOrInterfaceType("Long").equals(parameterType)) {
             this.longBoxed(blockStmt, inputParamValue, parameterType, argName);
+        } else if (StaticJavaParser.parseClassOrInterfaceType("Integer").equals(parameterType)) {
+            this.integerBoxed(blockStmt, inputParamValue, parameterType, argName);
+            // TODO all boxed
         } else {
             // Mock
             initializer = new MethodCallExpr(null, "mock", new NodeList<>(new ClassExpr(parameterType)));
@@ -72,11 +85,19 @@ public class TestMethodInputParamsGenerator {
         return new NameExpr(argName);
     }
 
+    private void integerBoxed(final BlockStmt blockStmt, final Object interceptedParamValue, final Type parameterType, final String argName) {
+        final String intExpr = String.format("%d", (Integer) interceptedParamValue);
+        this.addBoxed(blockStmt, parameterType, argName, intExpr);
+    }
 
     private void longBoxed(final BlockStmt blockStmt, final Object interceptedParamValue,
                            final Type parameterType, final String argName) {
         final String longExpr = String.format("%dL", (Long) interceptedParamValue);
-        final Expression initializer = new IntegerLiteralExpr(longExpr);
+        this.addBoxed(blockStmt, parameterType, argName, longExpr);
+    }
+
+    private void addBoxed(final BlockStmt blockStmt, final Type parameterType, final String argName, final String intExpr) {
+        final Expression initializer = new IntegerLiteralExpr(intExpr);
         final VariableDeclarator argDeclarator = new VariableDeclarator(parameterType, argName, initializer);
         final VariableDeclarationExpr argDeclarationExpr = new VariableDeclarationExpr(argDeclarator);
         blockStmt.addStatement(new ExpressionStmt(argDeclarationExpr));

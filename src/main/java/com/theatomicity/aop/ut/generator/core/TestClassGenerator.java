@@ -40,8 +40,10 @@ public class TestClassGenerator {
             final String processedClass = Files.readString(sourceFile.toPath());
             final CompilationUnit originCompilationUnit = StaticJavaParser.parse(processedClass);
             final MethodDeclaration originMethod = this.findOriginMethodDeclaration(originCompilationUnit, methodExecution);
-            final MethodDeclaration newTestMethodDeclaration = this.testMethodGenerator.processOriginMethod(originCompilationUnit, originMethod);
-            this.dumpTestClass(originCompilationUnit, methodExecution, newTestMethodDeclaration);
+            final File testFile = this.getJavaFile(methodExecution, TEST_BASEPATH, AUTO_TEST_SUFFIX);
+            final CompilationUnit testCompilationUnit = this.getTestCompilationUnit(originCompilationUnit, testFile);
+            final MethodDeclaration newTestMethodDeclaration = this.testMethodGenerator.processOriginMethod(originCompilationUnit, originMethod, testCompilationUnit);
+            this.dumpTestClass(testCompilationUnit, methodExecution, newTestMethodDeclaration, testFile);
         } catch (final IOException e) {
             log.info("{} {}", e.getClass().getName(), e.getMessage());
         }
@@ -63,12 +65,10 @@ public class TestClassGenerator {
     }
 
 
-    private void dumpTestClass(final CompilationUnit originCompilationUnit,
+    private void dumpTestClass(final CompilationUnit testCompilationUnit,
                                final MethodExecution methodExecution,
-                               final MethodDeclaration testMethodDeclaration) {
-        final File testFile = this.getJavaFile(methodExecution, TEST_BASEPATH, AUTO_TEST_SUFFIX);
+                               final MethodDeclaration testMethodDeclaration, final File testFile) {
         try {
-            final CompilationUnit testCompilationUnit = this.getTestCompilationUnit(originCompilationUnit, testFile);
             this.copyMethodContentToTest(methodExecution, testMethodDeclaration, testCompilationUnit);
             this.createOrUpdateNewTestFile(testCompilationUnit, testFile);
         } catch (final IOException e) {
@@ -86,11 +86,14 @@ public class TestClassGenerator {
         }
     }
 
-    private void copyMethodContentToTest(final MethodExecution methodExecution, final MethodDeclaration testMethodDeclaration, final CompilationUnit testCompilationUnit) {
+    private void copyMethodContentToTest(final MethodExecution methodExecution,
+                                         final MethodDeclaration testMethodDeclaration,
+                                         final CompilationUnit testCompilationUnit) {
         final String testMethodName = String.format("%s_%d", methodExecution.getName(), methodExecution.getHashCode());
         final MethodDeclaration methodDeclaration = testCompilationUnit.getType(0)
                 .addMethod(testMethodName)
                 .addAnnotation("Test");
+        methodDeclaration.setThrownExceptions(testMethodDeclaration.getThrownExceptions());
         testMethodDeclaration.getBody().ifPresent(methodDeclaration::setBody);
     }
 
@@ -108,7 +111,8 @@ public class TestClassGenerator {
 
         // class and annotation
         final ClassOrInterfaceDeclaration testClass = this.getClassAndAnnotation(originClass, testCompilationUnit);
-
+        testClass.setPublic(false);
+        
         // class fields for dependencies
         this.addClassFields(originClass, testClass);
 
@@ -153,11 +157,13 @@ public class TestClassGenerator {
 
     private void addClassFields(final ClassOrInterfaceDeclaration originClass, final ClassOrInterfaceDeclaration testClass) {
         for (final FieldDeclaration field : originClass.getFields()) {
-            final Type commonType = field.getCommonType();
-            final VariableDeclarator variableDeclarator = field.getVariables().get(0);
-            final SimpleName name = variableDeclarator.getName();
-            final FieldDeclaration fieldDeclaration = testClass.addPrivateField(commonType, name.asString());
-            fieldDeclaration.addMarkerAnnotation("Mock");
+            if (!field.isStatic()) {
+                final Type commonType = field.getCommonType();
+                final VariableDeclarator variableDeclarator = field.getVariables().get(0);
+                final SimpleName name = variableDeclarator.getName();
+                final FieldDeclaration fieldDeclaration = testClass.addPrivateField(commonType, name.asString());
+                fieldDeclaration.addMarkerAnnotation("Mock");
+            }
         }
     }
 

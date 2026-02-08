@@ -10,6 +10,7 @@ import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class TestMethodGenerator {
-    
+
     private final GeneratorUtils generatorUtils;
 
     private final TestMethodInputParamsGenerator testMethodInputParamsGenerator;
@@ -26,7 +27,8 @@ public class TestMethodGenerator {
     private final TestMethodDepsConfigurer testMethodDepsConfigurer;
 
     public MethodDeclaration processOriginMethod(final CompilationUnit originCompilationUnit,
-                                                 final MethodDeclaration originMethod) {
+                                                 final MethodDeclaration originMethod,
+                                                 final CompilationUnit testCompilationUnit) {
         // creates empty @Test method
         final MethodDeclaration testMethodDeclaration = this.initEmptyMethod(originMethod);
         // Create new blockStmt
@@ -34,7 +36,7 @@ public class TestMethodGenerator {
         // adds calling parameters
         final NodeList<Expression> callingParameters = this.addCallingParameters(originCompilationUnit, originMethod, blockStmt);
         // add dependency stubbing
-        this.testMethodDepsConfigurer.handle(originCompilationUnit, originMethod, blockStmt);
+        this.testMethodDepsConfigurer.handle(originCompilationUnit, originMethod, blockStmt, testCompilationUnit);
         // adds method call
         this.addMethodCall(originCompilationUnit, originMethod, blockStmt, callingParameters);
         // adds blockStmt to method
@@ -43,10 +45,14 @@ public class TestMethodGenerator {
 
     MethodDeclaration initEmptyMethod(final MethodDeclaration originMethodDeclaration) {
         final String testMethodName = originMethodDeclaration.getName().asString();
+        final NodeList<ReferenceType> thrownExceptions = originMethodDeclaration.getThrownExceptions();
         final Type voidType = new VoidType();
         final NodeList<Modifier> modifiers = new NodeList<>();
         final MethodDeclaration testMethodDeclaration = new MethodDeclaration(modifiers, voidType, testMethodName);
         testMethodDeclaration.addMarkerAnnotation("Test");
+        if (thrownExceptions.isNonEmpty()) {
+            testMethodDeclaration.setThrownExceptions(thrownExceptions);
+        }
         return testMethodDeclaration;
     }
 

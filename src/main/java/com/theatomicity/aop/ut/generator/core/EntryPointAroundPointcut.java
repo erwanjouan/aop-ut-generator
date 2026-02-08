@@ -1,5 +1,6 @@
 package com.theatomicity.aop.ut.generator.core;
 
+import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -31,8 +32,11 @@ public class EntryPointAroundPointcut {
         } finally {
             log.info("End MethodExecution: {} {} {}", methodExecution.getClassName(), methodExecution.getName(), methodExecution.getResult());
             methodExecution.setEndTime(System.nanoTime());
-            this.cache.add(methodExecution);
-            this.testClassGenerator.generateUnitTest(methodExecution);
+            final boolean isNewMethodExecution = this.cache.add(methodExecution);
+            final boolean isRepository = methodExecution.getSimpleClassName().contains("Repository");
+            if (isNewMethodExecution && !isRepository) {
+                this.testClassGenerator.generateUnitTest(methodExecution);
+            }
         }
         return result;
     }
