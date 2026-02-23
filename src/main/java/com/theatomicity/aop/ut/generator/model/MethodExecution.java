@@ -1,16 +1,22 @@
-package com.theatomicity.aop.ut.generator.core;
+package com.theatomicity.aop.ut.generator.model;
 
 import lombok.Data;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 @Data
 @ToString
+@Slf4j
 public class MethodExecution {
     private List<InterceptedParam> inputParams;
     private String name;
@@ -39,8 +45,20 @@ public class MethodExecution {
         methodExecution.setClassName(clazzName);
         methodExecution.setSimpleClassName(simpleClazzName);
         methodExecution.setInputParams(inputParams);
-        methodExecution.setStartTime(System.nanoTime());
+        methodExecution.setStartTime(System.currentTimeMillis());
         methodExecution.setHashCode(jointPoint.hashCode());
         return methodExecution;
+    }
+
+    public void log() {
+        log.debug("MethodExecution {}.{} {}->{} {}", this.getClassName(), this.getName(),
+                this.displayTs(this.getStartTime()), this.displayTs(this.getEndTime()),
+                this.getResult());
+    }
+
+    private String displayTs(final long timeStamp) {
+        final Instant instant = Instant.ofEpochMilli(timeStamp);
+        final LocalDateTime localDateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        return localDateTime.format(DateTimeFormatter.ISO_DATE_TIME);
     }
 }

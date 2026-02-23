@@ -1,4 +1,4 @@
-package com.theatomicity.aop.ut.generator.core;
+package com.theatomicity.aop.ut.generator.utils;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.PackageDeclaration;

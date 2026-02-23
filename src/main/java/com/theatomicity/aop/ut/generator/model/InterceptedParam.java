@@ -1,4 +1,4 @@
-package com.theatomicity.aop.ut.generator.core;
+package com.theatomicity.aop.ut.generator.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

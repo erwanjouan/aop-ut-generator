@@ -10,6 +10,9 @@ import com.github.javaparser.printer.DefaultPrettyPrinterVisitor;
 import com.github.javaparser.printer.configuration.DefaultConfigurationOption;
 import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
 import com.github.javaparser.printer.configuration.Indentation;
+import com.theatomicity.aop.ut.generator.model.InterceptedParam;
+import com.theatomicity.aop.ut.generator.model.MethodExecution;
+import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -45,7 +48,7 @@ public class TestClassGenerator {
             final MethodDeclaration newTestMethodDeclaration = this.testMethodGenerator.processOriginMethod(originCompilationUnit, originMethod, testCompilationUnit);
             this.dumpTestClass(testCompilationUnit, methodExecution, newTestMethodDeclaration, testFile);
         } catch (final IOException e) {
-            log.info("{} {}", e.getClass().getName(), e.getMessage());
+            log.debug("{} {}", e.getClass().getName(), e.getMessage());
         }
     }
 
@@ -112,7 +115,7 @@ public class TestClassGenerator {
         // class and annotation
         final ClassOrInterfaceDeclaration testClass = this.getClassAndAnnotation(originClass, testCompilationUnit);
         testClass.setPublic(false);
-        
+
         // class fields for dependencies
         this.addClassFields(originClass, testClass);
 

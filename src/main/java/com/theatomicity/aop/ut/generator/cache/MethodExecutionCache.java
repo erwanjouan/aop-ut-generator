@@ -3,12 +3,13 @@ package com.theatomicity.aop.ut.generator.cache;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
-import com.theatomicity.aop.ut.generator.core.GeneratorUtils;
-import com.theatomicity.aop.ut.generator.core.InterceptedParam;
-import com.theatomicity.aop.ut.generator.core.MethodExecution;
+import com.theatomicity.aop.ut.generator.model.InterceptedParam;
+import com.theatomicity.aop.ut.generator.model.MethodExecution;
+import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -18,6 +19,7 @@ import java.util.*;
 @Setter
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class MethodExecutionCache {
 
     private final GeneratorUtils generatorUtils;
@@ -25,19 +27,7 @@ public class MethodExecutionCache {
     private final List<MethodExecution> cache = new ArrayList<>();
 
     public boolean add(final MethodExecution methodExecution) {
-        if (this.isNewMethodExecution(methodExecution)) {
-            return this.cache.add(methodExecution);
-        }
-        return false;
-    }
-
-    private boolean isNewMethodExecution(final MethodExecution methodExecution) {
-        return this.cache.stream()
-                .filter(cachedMethodExecution -> this.matchesClass(methodExecution, cachedMethodExecution))
-                .filter(cachedMethodExecution -> this.matchesMethod(methodExecution, cachedMethodExecution))
-                .findAny()
-                .isEmpty();
-
+        return this.cache.add(methodExecution);
     }
 
     private boolean matchesArguments(final MethodExecution methodExecution, final MethodExecution cachedMethodExecution) {
@@ -109,11 +99,21 @@ public class MethodExecutionCache {
     }
 
     public List<MethodExecution> findTimeCompatibleExecutions(final MethodExecution methodExecution) {
+        log.debug(">>> findTimeCompatibleExecutions");
+        methodExecution.log();
         final long startTime = methodExecution.getStartTime();
         final long endTime = methodExecution.getEndTime();
-        return this.cache.stream()
-                .filter(entry -> entry.getStartTime() > startTime)
-                .filter(entry -> entry.getEndTime() < endTime)
+        final List<MethodExecution> methodExecutions = this.cache.stream()
+                .filter(entry -> entry.getStartTime() >= startTime)
+                .filter(entry -> entry.getEndTime() <= endTime)
+                .filter(entry -> !entry.getName().equals(methodExecution.getName()))
+                .filter(entry -> !entry.getClassName().equals(methodExecution.getClassName()))
                 .toList();
+        log.debug(">>> Start Compatible execution");
+        for (final MethodExecution compatibleMethodExecution : methodExecutions) {
+            compatibleMethodExecution.log();
+        }
+        log.debug(">>>> End Compatible execution");
+        return methodExecutions;
     }
 }

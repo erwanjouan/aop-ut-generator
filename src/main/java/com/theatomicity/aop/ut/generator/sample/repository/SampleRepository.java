@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class SampleRepository {
 
     public void doSomething() {
-        log.info("Do Something");
+        log.debug("Do Something");
     }
 
     public Long returnSomeThing() {

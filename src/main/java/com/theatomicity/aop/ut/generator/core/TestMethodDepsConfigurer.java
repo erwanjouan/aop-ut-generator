@@ -9,8 +9,12 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.type.Type;
 import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
+import com.theatomicity.aop.ut.generator.model.InterceptedParam;
+import com.theatomicity.aop.ut.generator.model.MethodExecution;
+import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
@@ -21,6 +25,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class TestMethodDepsConfigurer {
 
     public static final Pattern REPOSITORY_PATTERN = Pattern.compile(".*this.(.*Repository).*");
