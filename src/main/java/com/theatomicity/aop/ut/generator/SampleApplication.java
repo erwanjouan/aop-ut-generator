@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class SampleApplication implements CommandLineRunner {
 
-    public static void main(final String[] args) {
+    static void main(final String[] args) {
         SpringApplication.run(SampleApplication.class, args);
     }
 
@@ -17,8 +17,8 @@ public class SampleApplication implements CommandLineRunner {
     private SampleService sampleService;
 
     @Override
-    public void run(String... args) throws Exception {
-        sampleService.doSomething();
-        sampleService.doSomethingElse();
+    public void run(final String... args) throws Exception {
+        this.sampleService.doSomething();
+        this.sampleService.doSomethingElse();
     }
 }
