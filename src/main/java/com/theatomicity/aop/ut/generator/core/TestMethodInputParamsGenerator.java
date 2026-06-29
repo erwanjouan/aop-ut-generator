@@ -12,14 +12,16 @@ import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
 import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class TestMethodInputParamsGenerator {
 
     private final MethodExecutionCache cache;
+
+    public TestMethodInputParamsGenerator(final MethodExecutionCache cache) {
+        this.cache = cache;
+    }
 
     public Expression handle(final CompilationUnit originCompilationUnit,
                              final MethodDeclaration originMethod,

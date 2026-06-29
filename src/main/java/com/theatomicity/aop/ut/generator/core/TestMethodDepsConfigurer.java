@@ -12,9 +12,8 @@ import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
 import com.theatomicity.aop.ut.generator.model.InterceptedParam;
 import com.theatomicity.aop.ut.generator.model.MethodExecution;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -28,9 +27,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class TestMethodDepsConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(TestMethodDepsConfigurer.class);
 
     public static final Pattern REPOSITORY_PATTERN = Pattern.compile(".*this.(.*Repository).*");
     public static final String MOCK_OBJECT_PATTERN = "mock(%s.class)";
@@ -38,6 +37,11 @@ public class TestMethodDepsConfigurer {
     private final MethodExecutionCache cache;
 
     private final GeneratorUtils generatorUtils;
+
+    public TestMethodDepsConfigurer(final MethodExecutionCache cache, final GeneratorUtils generatorUtils) {
+        this.cache = cache;
+        this.generatorUtils = generatorUtils;
+    }
 
     public void handle(final CompilationUnit originCompilationUnit, final MethodDeclaration originMethod, final BlockStmt blockStmt,
                        final CompilationUnit testCompilationUnit) {
@@ -185,7 +189,7 @@ public class TestMethodDepsConfigurer {
         return MOCK_OBJECT_PATTERN.formatted(simpleName);
     }
 
-    private @NonNull String getDependencyArgs(final MethodExecution compatibleExecution) {
+    private String getDependencyArgs(final MethodExecution compatibleExecution) {
         return compatibleExecution.getInputParams().stream()
                 .map(InterceptedParam::getValue)
                 .map(this::normalizeArg)

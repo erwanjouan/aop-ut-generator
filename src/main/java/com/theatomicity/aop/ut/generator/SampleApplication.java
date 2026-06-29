@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class SampleApplication implements CommandLineRunner {
 
-    static void main(final String[] args) {
+    public static void main(final String[] args) {
         SpringApplication.run(SampleApplication.class, args);
     }
 

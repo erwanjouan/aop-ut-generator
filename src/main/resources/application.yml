@@ -1,3 +1,7 @@
 spring:
   application:
     name: aop.ut.generator
+
+ut-generator:
+  packages:
+    - com.theatomicity.aop.ut.generator.sample

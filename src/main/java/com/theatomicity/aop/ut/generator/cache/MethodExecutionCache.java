@@ -6,25 +6,27 @@ import com.github.javaparser.ast.body.Parameter;
 import com.theatomicity.aop.ut.generator.model.InterceptedParam;
 import com.theatomicity.aop.ut.generator.model.MethodExecution;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 
-@Getter
-@Setter
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class MethodExecutionCache {
+
+    private static final Logger log = LoggerFactory.getLogger(MethodExecutionCache.class);
 
     private final GeneratorUtils generatorUtils;
 
     private final List<MethodExecution> cache = new ArrayList<>();
+
+    public MethodExecutionCache(final GeneratorUtils generatorUtils) {
+        this.generatorUtils = generatorUtils;
+    }
+
+    public List<MethodExecution> getCache() { return cache; }
 
     public boolean add(final MethodExecution methodExecution) {
         return this.cache.add(methodExecution);

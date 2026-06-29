@@ -1,19 +1,23 @@
 package com.theatomicity.aop.ut.generator.sample.service;
 
 import com.theatomicity.aop.ut.generator.sample.repository.SampleRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
-@Slf4j
-@RequiredArgsConstructor
 public class SampleService {
 
+    private static final Logger log = LoggerFactory.getLogger(SampleService.class);
+
     private final SampleRepository sampleRepository;
+
+    public SampleService(final SampleRepository sampleRepository) {
+        this.sampleRepository = sampleRepository;
+    }
 
     public void doSomething() {
         this.sampleRepository.doSomething();

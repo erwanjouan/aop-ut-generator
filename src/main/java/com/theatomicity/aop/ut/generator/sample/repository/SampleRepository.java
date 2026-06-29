@@ -1,6 +1,7 @@
 package com.theatomicity.aop.ut.generator.sample.repository;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -8,8 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 
 @Component
-@Slf4j
 public class SampleRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(SampleRepository.class);
 
     public void doSomething() {
         log.debug("Do Something");

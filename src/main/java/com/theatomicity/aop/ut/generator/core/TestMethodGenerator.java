@@ -14,11 +14,9 @@ import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class TestMethodGenerator {
 
     private final GeneratorUtils generatorUtils;
@@ -26,6 +24,14 @@ public class TestMethodGenerator {
     private final TestMethodInputParamsGenerator testMethodInputParamsGenerator;
 
     private final TestMethodDepsConfigurer testMethodDepsConfigurer;
+
+    public TestMethodGenerator(final GeneratorUtils generatorUtils,
+                               final TestMethodInputParamsGenerator testMethodInputParamsGenerator,
+                               final TestMethodDepsConfigurer testMethodDepsConfigurer) {
+        this.generatorUtils = generatorUtils;
+        this.testMethodInputParamsGenerator = testMethodInputParamsGenerator;
+        this.testMethodDepsConfigurer = testMethodDepsConfigurer;
+    }
 
     public MethodDeclaration processOriginMethod(final CompilationUnit originCompilationUnit,
                                                  final MethodDeclaration originMethod,

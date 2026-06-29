@@ -13,8 +13,8 @@ import com.github.javaparser.printer.configuration.Indentation;
 import com.theatomicity.aop.ut.generator.model.InterceptedParam;
 import com.theatomicity.aop.ut.generator.model.MethodExecution;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -24,13 +24,18 @@ import java.nio.file.Path;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class TestClassGenerator {
+
+    private static final Logger log = LoggerFactory.getLogger(TestClassGenerator.class);
 
     private final TestMethodGenerator testMethodGenerator;
 
     private final GeneratorUtils generatorUtils;
+
+    public TestClassGenerator(final TestMethodGenerator testMethodGenerator, final GeneratorUtils generatorUtils) {
+        this.testMethodGenerator = testMethodGenerator;
+        this.generatorUtils = generatorUtils;
+    }
 
     public static final String SRC_BASEPATH = "src/main/java";
     public static final String TEST_BASEPATH = "src/test/java";
