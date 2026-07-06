@@ -1,4 +1,4 @@
-package com.theatomicity.aop.ut.generator.core;
+package com.theatomicity.aop.ut.generator.core.method;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
@@ -17,7 +17,7 @@ import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TestMethodGenerator {
+public class UtMethodGenerator {
 
     private final GeneratorUtils generatorUtils;
 
@@ -25,38 +25,39 @@ public class TestMethodGenerator {
 
     private final TestMethodDepsConfigurer testMethodDepsConfigurer;
 
-    public TestMethodGenerator(final GeneratorUtils generatorUtils,
-                               final TestMethodInputParamsGenerator testMethodInputParamsGenerator,
-                               final TestMethodDepsConfigurer testMethodDepsConfigurer) {
+    public UtMethodGenerator(final GeneratorUtils generatorUtils,
+                             final TestMethodInputParamsGenerator testMethodInputParamsGenerator,
+                             final TestMethodDepsConfigurer testMethodDepsConfigurer) {
         this.generatorUtils = generatorUtils;
         this.testMethodInputParamsGenerator = testMethodInputParamsGenerator;
         this.testMethodDepsConfigurer = testMethodDepsConfigurer;
     }
 
-    public MethodDeclaration processOriginMethod(final CompilationUnit originCompilationUnit,
+    public MethodDeclaration processOriginMethod(final CompilationUnit originCu,
                                                  final MethodDeclaration originMethod,
-                                                 final CompilationUnit testCompilationUnit) {
+                                                 final CompilationUnit utCu) {
         // creates empty @Test method
-        final MethodDeclaration testMethodDeclaration = this.initEmptyMethod(originMethod);
+        final MethodDeclaration testMethodDeclaration = this.initEmptyMethod(originMethod, utCu);
         // Create new blockStmt
         final BlockStmt blockStmt = new BlockStmt();
         // adds calling parameters
-        final NodeList<Expression> callingParameters = this.addCallingParameters(originCompilationUnit, originMethod, blockStmt);
+        final NodeList<Expression> callingParameters = this.addCallingParameters(originCu, originMethod, blockStmt);
         // add dependency stubbing
-        this.testMethodDepsConfigurer.handle(originCompilationUnit, originMethod, blockStmt, testCompilationUnit);
+        this.testMethodDepsConfigurer.handle(originCu, originMethod, blockStmt, utCu);
         // adds method call
-        this.addMethodCall(originCompilationUnit, originMethod, blockStmt, callingParameters);
+        this.addMethodCall(originCu, originMethod, blockStmt, callingParameters, utCu);
         // adds blockStmt to method
         return testMethodDeclaration.setBody(blockStmt);
     }
 
-    MethodDeclaration initEmptyMethod(final MethodDeclaration originMethodDeclaration) {
+    public MethodDeclaration initEmptyMethod(final MethodDeclaration originMethodDeclaration, final CompilationUnit utCu) {
         final String testMethodName = originMethodDeclaration.getName().asString();
         final NodeList<ReferenceType> thrownExceptions = originMethodDeclaration.getThrownExceptions();
         final Type voidType = new VoidType();
         final NodeList<Modifier> modifiers = new NodeList<>();
         final MethodDeclaration testMethodDeclaration = new MethodDeclaration(modifiers, voidType, testMethodName);
-        testMethodDeclaration.addMarkerAnnotation("Test");
+        testMethodDeclaration.addAnnotation("Test");
+        this.generatorUtils.addImportIfNotExists(utCu, "org.junit.jupiter.api.Test", false, false);
         if (thrownExceptions.isNonEmpty()) {
             testMethodDeclaration.setThrownExceptions(thrownExceptions);
         }
@@ -64,20 +65,20 @@ public class TestMethodGenerator {
     }
 
 
-    private NodeList<Expression> addCallingParameters(final CompilationUnit originCompilationUnit,
+    private NodeList<Expression> addCallingParameters(final CompilationUnit originCu,
                                                       final MethodDeclaration originMethod,
                                                       final BlockStmt blockStmt) {
         final NodeList<Expression> callArguments = new NodeList<>();
         for (final Parameter parameter : originMethod.getParameters()) {
-            final Expression variable = this.testMethodInputParamsGenerator.handle(originCompilationUnit, originMethod, blockStmt, parameter);
+            final Expression variable = this.testMethodInputParamsGenerator.handle(originCu, originMethod, blockStmt, parameter);
             callArguments.add(variable);
         }
         return callArguments;
     }
 
-    void addMethodCall(final CompilationUnit originCompilationUnit, final MethodDeclaration originMethod,
-                       final BlockStmt blockStmt, final NodeList<Expression> callingParameters) {
-        final ClassOrInterfaceDeclaration originClass = this.generatorUtils.getMainType(originCompilationUnit);
+    public void addMethodCall(final CompilationUnit originCu, final MethodDeclaration originMethod,
+                              final BlockStmt blockStmt, final NodeList<Expression> callingParameters, final CompilationUnit utCu) {
+        final ClassOrInterfaceDeclaration originClass = this.generatorUtils.getMainType(originCu);
         final String originClassName = originClass.getNameAsString();
         final String underTestName = this.generatorUtils.getInstanceName(originClassName);
         final MethodCallExpr methodCallExpr = new MethodCallExpr(
@@ -91,6 +92,7 @@ public class TestMethodGenerator {
         } else {
             final NodeList<Expression> callArguments = new NodeList<>();
             callArguments.add(methodCallExpr);
+            this.generatorUtils.addImportIfNotExists(utCu, "org.junit.jupiter.api.Assertions.assertNotNull", true, false);
             final MethodCallExpr nonNullAssertion = new MethodCallExpr(null, "assertNotNull", callArguments);
             blockStmt.addStatement(nonNullAssertion);
         }

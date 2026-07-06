@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class MethodExecutionCacheTest {
 
@@ -21,18 +22,19 @@ class MethodExecutionCacheTest {
 
     @BeforeEach
     void setUp() {
-        cache = new MethodExecutionCache(new GeneratorUtils());
+        this.cache = new MethodExecutionCache(new GeneratorUtils());
     }
 
-    private MethodExecution exec(String className, String simpleName, String method, long start, long end) {
-        MethodExecution e = new MethodExecution();
+    private MethodExecution exec(final String className, final String simpleName, final String method, final long start, final long end) {
+        final MethodExecution e = new MethodExecution();
         e.setClassName(className);
         e.setSimpleClassName(simpleName);
-        e.setName(method);
+        e.setMethodName(method);
         e.setInputParams(List.of());
         e.setStartTime(start);
         e.setEndTime(end);
         e.setHashCode(method.hashCode());
+        e.setCaller(Optional.empty());
         return e;
     }
 
@@ -40,113 +42,121 @@ class MethodExecutionCacheTest {
 
     @Test
     void findTimeCompatibleExecutions_returnsCallsWithinTimeWindow() {
-        MethodExecution parent = exec("com.example.ServiceA", "ServiceA", "doWork",  100L, 500L);
-        MethodExecution child  = exec("com.example.RepoB",    "RepoB",    "findAll", 200L, 300L);
-        MethodExecution before = exec("com.example.RepoC",    "RepoC",    "save",    10L,  80L);
+        final MethodExecution parent = this.exec("com.example.ServiceA", "ServiceA", "doWork", 100L, 500L);
+        final MethodExecution child = this.exec("com.example.RepoB", "RepoB", "findAll", 200L, 300L);
+        // caller must point into the body of doWork (line 3 in the multi-line source below)
+        child.setCaller(Optional.of(new StackTraceElement("com.example.ServiceA", "doWork", "ServiceA.java", 3)));
+        final MethodExecution before = this.exec("com.example.RepoC", "RepoC", "save", 10L, 80L);
+        final CompilationUnit cu = StaticJavaParser.parse(
+                "class ServiceA {\n  void doWork() {\n    repoB.findAll();\n  }\n}");
+        final MethodDeclaration originMethod = cu.getType(0).getMethods().get(0);
 
-        cache.add(parent);
-        cache.add(child);
-        cache.add(before);
+        this.cache.add(parent);
+        this.cache.add(child);
+        this.cache.add(before);
 
-        assertThat(cache.findTimeCompatibleExecutions(parent)).containsExactly(child);
+        assertThat(this.cache.findChildExecutions(parent, originMethod)).containsExactly(child);
     }
 
     @Test
-    void findTimeCompatibleExecutions_excludesSameClass() {
-        MethodExecution parent    = exec("com.example.ServiceA", "ServiceA", "doWork",  100L, 500L);
-        MethodExecution sameClass = exec("com.example.ServiceA", "ServiceA", "helper",  200L, 300L);
+    void findChildExecutions_excludesSameClass() {
+        final MethodExecution parent = this.exec("com.example.ServiceA", "ServiceA", "doWork", 100L, 500L);
+        final MethodExecution sameClass = this.exec("com.example.ServiceA", "ServiceA", "helper", 200L, 300L);
+        final MethodDeclaration originMethod = mock(MethodDeclaration.class);
 
-        cache.add(parent);
-        cache.add(sameClass);
+        this.cache.add(parent);
+        this.cache.add(sameClass);
 
-        assertThat(cache.findTimeCompatibleExecutions(parent)).isEmpty();
+        assertThat(this.cache.findChildExecutions(parent, originMethod)).isEmpty();
     }
 
     @Test
-    void findTimeCompatibleExecutions_excludesSameMethodName() {
+    void findChildExecutions_excludesSameMethodName() {
         // Mirrors the real-world case: SampleService.doSomething() calls
         // SampleRepository.doSomething() — same name, different class.
         // The same-name filter prevents generating a stub for it.
-        MethodExecution parent   = exec("com.example.ServiceA",    "ServiceA",    "doWork", 100L, 500L);
-        MethodExecution sameName = exec("com.example.RepositoryB", "RepositoryB", "doWork", 200L, 300L);
+        final MethodExecution parent = this.exec("com.example.ServiceA", "ServiceA", "doWork", 100L, 500L);
+        final MethodExecution sameName = this.exec("com.example.RepositoryB", "RepositoryB", "doWork", 200L, 300L);
+        final MethodDeclaration originMethod = mock(MethodDeclaration.class);
 
-        cache.add(parent);
-        cache.add(sameName);
+        this.cache.add(parent);
+        this.cache.add(sameName);
 
-        assertThat(cache.findTimeCompatibleExecutions(parent)).isEmpty();
+        assertThat(this.cache.findChildExecutions(parent, originMethod)).isEmpty();
     }
 
     @Test
-    void findTimeCompatibleExecutions_excludesCallsOutsideWindow() {
-        MethodExecution parent = exec("com.example.ServiceA", "ServiceA", "doWork",  100L, 500L);
-        MethodExecution after  = exec("com.example.RepoB",    "RepoB",    "findAll", 600L, 700L);
+    void findChildExecutions_excludesCallsOutsideWindow() {
+        final MethodExecution parent = this.exec("com.example.ServiceA", "ServiceA", "doWork", 100L, 500L);
+        final MethodExecution after = this.exec("com.example.RepoB", "RepoB", "findAll", 600L, 700L);
+        final MethodDeclaration originMethod = mock(MethodDeclaration.class);
 
-        cache.add(parent);
-        cache.add(after);
+        this.cache.add(parent);
+        this.cache.add(after);
 
-        assertThat(cache.findTimeCompatibleExecutions(parent)).isEmpty();
+        assertThat(this.cache.findChildExecutions(parent, originMethod)).isEmpty();
     }
 
     // ── findNameMatchingExecution ─────────────────────────────────────────────
 
     @Test
     void findNameMatchingExecution_matchesByNameAndFullClass() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void myMethod() {} }");
-        MethodDeclaration method = cu.getType(0).getMethods().get(0);
+        final MethodDeclaration method = cu.getType(0).getMethods().get(0);
 
-        MethodExecution exec = exec("com.example.MyService", "MyService", "myMethod", 100L, 200L);
-        cache.add(exec);
+        final MethodExecution exec = this.exec("com.example.MyService", "MyService", "myMethod", 100L, 200L);
+        this.cache.add(exec);
 
-        Optional<MethodExecution> result = cache.findNameMatchingExecution(cu, method);
+        final Optional<MethodExecution> result = this.cache.findOriginMethodInCache(cu, method);
 
         assertThat(result).contains(exec);
     }
 
     @Test
-    void findNameMatchingExecution_returnsEmptyWhenNoMatch() {
-        CompilationUnit cu = StaticJavaParser.parse(
+    void findOriginMethodInCache_returnsEmptyWhenNoMatch() {
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void myMethod() {} }");
-        MethodDeclaration method = cu.getType(0).getMethods().get(0);
+        final MethodDeclaration method = cu.getType(0).getMethods().get(0);
 
-        assertThat(cache.findNameMatchingExecution(cu, method)).isEmpty();
+        assertThat(this.cache.findOriginMethodInCache(cu, method)).isEmpty();
     }
 
     @Test
-    void findNameMatchingExecution_doesNotMatchWrongClass() {
-        CompilationUnit cu = StaticJavaParser.parse(
+    void findOriginMethodInCache_doesNotMatchWrongClass() {
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void myMethod() {} }");
-        MethodDeclaration method = cu.getType(0).getMethods().get(0);
+        final MethodDeclaration method = cu.getType(0).getMethods().get(0);
 
-        MethodExecution wrongClass = exec("com.example.OtherService", "OtherService", "myMethod", 100L, 200L);
-        cache.add(wrongClass);
+        final MethodExecution wrongClass = this.exec("com.example.OtherService", "OtherService", "myMethod", 100L, 200L);
+        this.cache.add(wrongClass);
 
-        assertThat(cache.findNameMatchingExecution(cu, method)).isEmpty();
+        assertThat(this.cache.findOriginMethodInCache(cu, method)).isEmpty();
     }
 
     // ── findInputParamValue ───────────────────────────────────────────────────
 
     @Test
     void findInputParamValue_returnsValueForMatchingParam() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void myMethod(Long id) {} }");
-        MethodDeclaration method = cu.getType(0).getMethods().get(0);
-        Parameter parameter = method.getParameter(0);
+        final MethodDeclaration method = cu.getType(0).getMethods().get(0);
+        final Parameter parameter = method.getParameter(0);
 
-        MethodExecution exec = exec("com.example.MyService", "MyService", "myMethod", 100L, 200L);
+        final MethodExecution exec = this.exec("com.example.MyService", "MyService", "myMethod", 100L, 200L);
         exec.setInputParams(List.of(new InterceptedParam("id", Long.class, 42L)));
-        cache.add(exec);
+        this.cache.add(exec);
 
-        assertThat(cache.findInputParamValue(cu, method, parameter)).isEqualTo(42L);
+        assertThat(this.cache.findInputParamValue(cu, method, parameter)).isEqualTo(42L);
     }
 
     @Test
     void findInputParamValue_returnsNullWhenParamNotFound() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void myMethod(Long id) {} }");
-        MethodDeclaration method = cu.getType(0).getMethods().get(0);
-        Parameter parameter = method.getParameter(0);
+        final MethodDeclaration method = cu.getType(0).getMethods().get(0);
+        final Parameter parameter = method.getParameter(0);
 
-        assertThat(cache.findInputParamValue(cu, method, parameter)).isNull();
+        assertThat(this.cache.findInputParamValue(cu, method, parameter)).isNull();
     }
 }

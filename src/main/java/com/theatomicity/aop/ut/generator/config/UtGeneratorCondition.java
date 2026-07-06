@@ -9,7 +9,7 @@ public class UtGeneratorCondition implements Condition {
 
     @Override
     public boolean matches(final ConditionContext context, final AnnotatedTypeMetadata metadata) {
-        final String firstPackage = context.getEnvironment().getProperty("ut-generator.packages[0]");
+        final String firstPackage = context.getEnvironment().getProperty("ut-generator.packages.targets[0]");
         return firstPackage != null && !firstPackage.isBlank();
     }
 }

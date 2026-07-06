@@ -5,11 +5,26 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.util.ArrayList;
 import java.util.List;
 
-@ConfigurationProperties(prefix = "ut-generator")
+@ConfigurationProperties(prefix = "ut-generator.packages")
 public class UtGeneratorProperties {
 
-    private List<String> packages = new ArrayList<>();
+    private String base;
 
-    public List<String> getPackages() { return packages; }
-    public void setPackages(final List<String> packages) { this.packages = packages; }
+    private List<String> targets = new ArrayList<>();
+
+    public List<String> getTargets() {
+        return this.targets;
+    }
+
+    public void setTargets(final List<String> targets) {
+        this.targets = targets;
+    }
+
+    public String getBase() {
+        return this.base;
+    }
+
+    public void setBase(final String base) {
+        this.base = base;
+    }
 }

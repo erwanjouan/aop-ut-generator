@@ -2,6 +2,7 @@ package com.theatomicity.aop.ut.generator.core;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
+import com.theatomicity.aop.ut.generator.core.method.TestMethodDepsConfigurer;
 import com.theatomicity.aop.ut.generator.model.InterceptedParam;
 import com.theatomicity.aop.ut.generator.model.MethodExecution;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
@@ -17,6 +18,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doCallRealMethod;
 
 @ExtendWith(MockitoExtension.class)
 class TestMethodDepsConfigurerTest {
@@ -38,7 +43,7 @@ class TestMethodDepsConfigurerTest {
 
     private MethodExecution withResult(final Class<?> type, final Object value) {
         final MethodExecution exec = new MethodExecution();
-        exec.setName("repoMethod");
+        exec.setMethodName("repoMethod");
         exec.setClassName("com.example.Repo");
         exec.setSimpleClassName("Repo");
         exec.setInputParams(List.of());
@@ -51,7 +56,7 @@ class TestMethodDepsConfigurerTest {
 
     private MethodExecution withNoResult() {
         final MethodExecution exec = new MethodExecution();
-        exec.setName("repoMethod");
+        exec.setMethodName("repoMethod");
         exec.setClassName("com.example.Repo");
         exec.setSimpleClassName("Repo");
         exec.setInputParams(List.of());
@@ -111,6 +116,7 @@ class TestMethodDepsConfigurerTest {
     @Test
     void optionalResult_addsImport() {
         final CompilationUnit cu = new CompilationUnit();
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
         this.configurer.getDependencyResult(this.withResult(Optional.class, Optional.empty()), cu);
         assertThat(cu.getImports().toString()).contains("java.util.Optional");
     }
@@ -118,6 +124,7 @@ class TestMethodDepsConfigurerTest {
     @Test
     void optionalResult_addsOptionalBigDecimal() {
         final CompilationUnit cu = new CompilationUnit();
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
         final String dependencyResult = this.configurer.getDependencyResult(this.withResult(Optional.class, Optional.of(BigDecimal.ONE)), cu);
         assertThat(cu.getImports().toString()).contains("java.util.Optional");
         assertThat(dependencyResult).isEqualTo("Optional.of(mock(BigDecimal.class))");
@@ -127,14 +134,19 @@ class TestMethodDepsConfigurerTest {
 
     @Test
     void customType_returnsMockExpressionWithSimpleName() {
+        final CompilationUnit cu = new CompilationUnit();
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
+        doCallRealMethod().when(this.generatorUtils).addInlinedMock(eq(cu), anyString());
         final String result = this.configurer.getDependencyResult(
-                this.withResult(ArrayList.class, new ArrayList<>()), new CompilationUnit());
+                this.withResult(ArrayList.class, new ArrayList<>()), cu);
         assertThat(result).isEqualTo("mock(ArrayList.class)");
     }
 
     @Test
     void customType_addsFullyQualifiedImport() {
         final CompilationUnit cu = new CompilationUnit();
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
+        doCallRealMethod().when(this.generatorUtils).addInlinedMock(eq(cu), anyString());
         this.configurer.getDependencyResult(this.withResult(ArrayList.class, new ArrayList<>()), cu);
         assertThat(cu.getImports().toString()).contains("java.util.ArrayList");
     }
@@ -149,6 +161,8 @@ class TestMethodDepsConfigurerTest {
     @Test
     void customType_nonPrimitive() {
         final CompilationUnit cu = new CompilationUnit();
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
+        doCallRealMethod().when(this.generatorUtils).addInlinedMock(eq(cu), anyString());
         final String dependencyResult = this.configurer.getDependencyResult(this.withResult(BigDecimal.class, BigDecimal.valueOf(1)), cu);
         assertThat(cu.getImports().toString()).contains("java.math.BigDecimal");
         assertThat(dependencyResult).isEqualTo("mock(BigDecimal.class)");
@@ -158,6 +172,8 @@ class TestMethodDepsConfigurerTest {
     void customType_processBigDecimalList() {
         final CompilationUnit cu = new CompilationUnit();
         final BigDecimal elt = BigDecimal.valueOf(1L);
+        doCallRealMethod().when(this.generatorUtils).addImportIfNotExists(eq(cu), anyString(), anyBoolean(), anyBoolean());
+        doCallRealMethod().when(this.generatorUtils).addInlinedMock(eq(cu), anyString());
         final String result = this.configurer.getDependencyResult(this.withResult(List.class, List.of(elt)), cu);
         assertThat(result).isEqualTo("List.of(mock(BigDecimal.class))");
     }

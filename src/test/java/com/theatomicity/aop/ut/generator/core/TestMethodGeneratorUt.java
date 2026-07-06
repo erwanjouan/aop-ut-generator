@@ -6,6 +6,9 @@ import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.type.VoidType;
+import com.theatomicity.aop.ut.generator.core.method.TestMethodDepsConfigurer;
+import com.theatomicity.aop.ut.generator.core.method.TestMethodInputParamsGenerator;
+import com.theatomicity.aop.ut.generator.core.method.UtMethodGenerator;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,9 +18,10 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
-class TestMethodGeneratorTest {
+class TestMethodGeneratorUt {
 
     // package-private methods initEmptyMethod() and addMethodCall() are
     // accessible here because this test lives in the same package.
@@ -31,22 +35,23 @@ class TestMethodGeneratorTest {
     @Mock
     private TestMethodDepsConfigurer depsConfigurer;
 
-    private TestMethodGenerator testMethodGenerator;
+    private UtMethodGenerator utMethodGenerator;
 
     @BeforeEach
     void setUp() {
-        testMethodGenerator = new TestMethodGenerator(generatorUtils, inputParamsGenerator, depsConfigurer);
+        this.utMethodGenerator = new UtMethodGenerator(this.generatorUtils, this.inputParamsGenerator, this.depsConfigurer);
     }
 
     // ── initEmptyMethod ───────────────────────────────────────────────────────
 
     @Test
     void initEmptyMethod_createsVoidMethodWithTestAnnotation() {
-        MethodDeclaration origin = StaticJavaParser.parse(
-                "class Foo { public String bar() {} }")
+        final MethodDeclaration origin = StaticJavaParser.parse(
+                        "class Foo { public String bar() {} }")
                 .getType(0).getMethods().get(0);
+        final CompilationUnit utCu = new CompilationUnit();
 
-        MethodDeclaration result = testMethodGenerator.initEmptyMethod(origin);
+        final MethodDeclaration result = this.utMethodGenerator.initEmptyMethod(origin, utCu);
 
         assertThat(result.getNameAsString()).isEqualTo("bar");
         assertThat(result.getType()).isInstanceOf(VoidType.class);
@@ -55,22 +60,24 @@ class TestMethodGeneratorTest {
 
     @Test
     void initEmptyMethod_hasNoModifiers() {
-        MethodDeclaration origin = StaticJavaParser.parse(
-                "class Foo { public void doWork() {} }")
+        final MethodDeclaration origin = StaticJavaParser.parse(
+                        "class Foo { public void doWork() {} }")
                 .getType(0).getMethods().get(0);
+        final CompilationUnit utCu = new CompilationUnit();
 
-        MethodDeclaration result = testMethodGenerator.initEmptyMethod(origin);
+        final MethodDeclaration result = this.utMethodGenerator.initEmptyMethod(origin, utCu);
 
         assertThat(result.getModifiers()).isEmpty();
     }
 
     @Test
     void initEmptyMethod_propagatesThrownExceptions() {
-        MethodDeclaration origin = StaticJavaParser.parse(
-                "class Foo { public void doWork() throws Exception {} }")
+        final MethodDeclaration origin = StaticJavaParser.parse(
+                        "class Foo { public void doWork() throws Exception {} }")
                 .getType(0).getMethods().get(0);
+        final CompilationUnit utCu = new CompilationUnit();
 
-        MethodDeclaration result = testMethodGenerator.initEmptyMethod(origin);
+        final MethodDeclaration result = this.utMethodGenerator.initEmptyMethod(origin, utCu);
 
         assertThat(result.getThrownExceptions()).hasSize(1);
         assertThat(result.getThrownExceptions().get(0).asString()).isEqualTo("Exception");
@@ -78,11 +85,12 @@ class TestMethodGeneratorTest {
 
     @Test
     void initEmptyMethod_noExceptionsWhenOriginHasNone() {
-        MethodDeclaration origin = StaticJavaParser.parse(
-                "class Foo { public void doWork() {} }")
+        final MethodDeclaration origin = StaticJavaParser.parse(
+                        "class Foo { public void doWork() {} }")
                 .getType(0).getMethods().get(0);
+        final CompilationUnit utCu = new CompilationUnit();
 
-        MethodDeclaration result = testMethodGenerator.initEmptyMethod(origin);
+        final MethodDeclaration result = this.utMethodGenerator.initEmptyMethod(origin, utCu);
 
         assertThat(result.getThrownExceptions()).isEmpty();
     }
@@ -91,40 +99,43 @@ class TestMethodGeneratorTest {
 
     @Test
     void addMethodCall_wrapsNonVoidResultInAssertNotNull() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public String doWork() {} }");
-        MethodDeclaration origin = cu.getType(0).getMethods().get(0);
-        BlockStmt block = new BlockStmt();
+        final MethodDeclaration origin = cu.getType(0).getMethods().get(0);
+        final BlockStmt block = new BlockStmt();
+        final CompilationUnit utCu = new CompilationUnit();
 
-        testMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>());
+        this.utMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>(), utCu);
 
-        String body = block.toString();
+        final String body = block.toString();
         assertThat(body).contains("assertNotNull");
         assertThat(body).contains("myService.doWork()");
     }
 
     @Test
     void addMethodCall_doesNotWrapVoidReturn() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class MyService { public void doWork() {} }");
-        MethodDeclaration origin = cu.getType(0).getMethods().get(0);
-        BlockStmt block = new BlockStmt();
+        final MethodDeclaration origin = cu.getType(0).getMethods().get(0);
+        final BlockStmt block = new BlockStmt();
+        final CompilationUnit utCu = new CompilationUnit();
 
-        testMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>());
+        this.utMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>(), utCu);
 
-        String body = block.toString();
+        final String body = block.toString();
         assertThat(body).doesNotContain("assertNotNull");
         assertThat(body).contains("myService.doWork()");
     }
 
     @Test
     void addMethodCall_usesLowercaseInstanceName() {
-        CompilationUnit cu = StaticJavaParser.parse(
+        final CompilationUnit cu = StaticJavaParser.parse(
                 "package com.example; class OrderService { public String place() {} }");
-        MethodDeclaration origin = cu.getType(0).getMethods().get(0);
-        BlockStmt block = new BlockStmt();
+        final MethodDeclaration origin = cu.getType(0).getMethods().get(0);
+        final BlockStmt block = new BlockStmt();
+        final CompilationUnit utCu = new CompilationUnit();
 
-        testMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>());
+        this.utMethodGenerator.addMethodCall(cu, origin, block, new NodeList<>(), utCu);
 
         assertThat(block.toString()).contains("orderService.place()");
     }

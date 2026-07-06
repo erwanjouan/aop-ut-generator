@@ -15,8 +15,11 @@ public class SampleService {
 
     private final SampleRepository sampleRepository;
 
-    public SampleService(final SampleRepository sampleRepository) {
+    private final OtherService otherService;
+
+    public SampleService(final SampleRepository sampleRepository, final OtherService otherService) {
         this.sampleRepository = sampleRepository;
+        this.otherService = otherService;
     }
 
     public void doSomething() {
@@ -24,19 +27,12 @@ public class SampleService {
     }
 
     public Long doSomethingElse() throws Exception {
-        final Long l = this.sampleRepository.returnSomeThing();
-        if (l == 2L) {
-            this.sampleRepository.throwsSomeException();
-        }
-        return l;
+        this.otherService.sayLong(1L);
+        return this.sampleRepository.returnSomeThing();
     }
 
-    public List<BigDecimal> doSomethingWithList() throws Exception {
-        final List<BigDecimal> list = this.sampleRepository.returnSomeThingWithList();
-        if (list.isEmpty()) {
-            this.sampleRepository.throwsSomeException();
-        }
-        return list;
+    public List<BigDecimal> doSomethingWithList(final String input) {
+        return this.sampleRepository.returnSomeThingWithList(input);
     }
 
 }

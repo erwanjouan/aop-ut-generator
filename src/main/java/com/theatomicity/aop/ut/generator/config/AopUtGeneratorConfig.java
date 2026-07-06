@@ -2,15 +2,16 @@ package com.theatomicity.aop.ut.generator.config;
 
 import com.theatomicity.aop.ut.generator.cache.MethodExecutionCache;
 import com.theatomicity.aop.ut.generator.core.EntryPointAroundPointcut;
+import com.theatomicity.aop.ut.generator.stacktrace.StackTraceHandler;
 import com.theatomicity.aop.ut.generator.utils.GeneratorUtils;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.springframework.aop.aspectj.AspectJExpressionPointcut;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.context.annotation.Conditional;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Conditional;
 
 import java.util.stream.Collectors;
 
@@ -25,6 +26,11 @@ public class AopUtGeneratorConfig {
     }
 
     @Bean
+    public StackTraceHandler stackTraceHandler() {
+        return new StackTraceHandler();
+    }
+
+    @Bean
     public MethodExecutionCache methodExecutionCache(final GeneratorUtils generatorUtils) {
         return new MethodExecutionCache(generatorUtils);
     }
@@ -34,7 +40,7 @@ public class AopUtGeneratorConfig {
     public DefaultPointcutAdvisor dynamicPackageAdvisor(
             final UtGeneratorProperties properties,
             final EntryPointAroundPointcut entryPointAroundPointcut) {
-        final String expression = properties.getPackages().stream()
+        final String expression = properties.getTargets().stream()
                 .map(pkg -> "execution(* " + pkg + "..*.*(..))")
                 .collect(Collectors.joining(" || "));
         final AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();

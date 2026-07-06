@@ -1,7 +1,6 @@
-package com.theatomicity.aop.ut.generator.core;
+package com.theatomicity.aop.ut.generator.core.method;
 
 import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
@@ -26,13 +25,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.theatomicity.aop.ut.generator.utils.GeneratorUtils.MOCK_OBJECT_PATTERN;
+
 @Component
 public class TestMethodDepsConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(TestMethodDepsConfigurer.class);
 
     public static final Pattern REPOSITORY_PATTERN = Pattern.compile(".*this.(.*Repository).*");
-    public static final String MOCK_OBJECT_PATTERN = "mock(%s.class)";
 
     private final MethodExecutionCache cache;
 
@@ -43,46 +43,48 @@ public class TestMethodDepsConfigurer {
         this.generatorUtils = generatorUtils;
     }
 
-    public void handle(final CompilationUnit originCompilationUnit, final MethodDeclaration originMethod, final BlockStmt blockStmt,
-                       final CompilationUnit testCompilationUnit) {
-        this.cache.findNameMatchingExecution(originCompilationUnit, originMethod)
-                .map(this.cache::findTimeCompatibleExecutions)
+    public void handle(final CompilationUnit originCu, final MethodDeclaration originMethod, final BlockStmt blockStmt,
+                       final CompilationUnit utCu) {
+        this.cache.findOriginMethodInCache(originCu, originMethod)
+                .map(methodExecution -> this.cache.findChildExecutions(methodExecution, originMethod))
                 .ifPresent(compatibleExecutions -> compatibleExecutions.stream()
-                        .forEach(compatibleExecution -> this.processCompatibleExecution(originCompilationUnit, originMethod, compatibleExecution, blockStmt, testCompilationUnit)));
+                        .forEach(compatibleExecution -> this.processCompatibleExecution(originCu, originMethod, compatibleExecution, blockStmt, utCu)));
     }
 
-    private void processCompatibleExecution(final CompilationUnit originCompilationUnit, final MethodDeclaration originMethod,
+    private void processCompatibleExecution(final CompilationUnit originCu, final MethodDeclaration originMethod,
                                             final MethodExecution compatibleExecution, final BlockStmt blockStmt,
-                                            final CompilationUnit testCompilationUnit) {
-        final String dependencyName = this.getDependencyName(originCompilationUnit, compatibleExecution, originMethod);
-        final String dependencyMethodName = compatibleExecution.getName();
-        final String dependencyArgs = this.getDependencyArgs(compatibleExecution);
-        final String dependencyResult = this.getDependencyResult(compatibleExecution, testCompilationUnit);
-        final String dependencyExpression = this.getDependencyExpression(dependencyResult, dependencyName, dependencyMethodName, dependencyArgs);
+                                            final CompilationUnit utCu) {
+        final String dependencyName = this.getDependencyName(originCu, compatibleExecution, originMethod);
+        final String dependencyMethodName = compatibleExecution.getMethodName();
+        final String dependencyArgs = this.getDependencyArgs(compatibleExecution, utCu);
+        final String dependencyResult = this.getDependencyResult(compatibleExecution, utCu);
+        final String dependencyExpression = this.getDependencyExpression(dependencyResult, dependencyName, dependencyMethodName, dependencyArgs, utCu);
         blockStmt.addStatement(dependencyExpression);
     }
 
-    private String getDependencyExpression(final String dependencyResult, final String dependencyName, final String dependencyMethodName, final String dependencyArgs) {
+    private String getDependencyExpression(final String dependencyResult, final String dependencyName, final String dependencyMethodName, final String dependencyArgs, final CompilationUnit utCu) {
         if (Objects.isNull(dependencyResult)) {
+            this.generatorUtils.addImportIfNotExists(utCu, "org.mockito.Mockito.doNothing", true, false);
             return "doNothing().when(%s).%s(%s);".formatted(
                     dependencyName, dependencyMethodName, dependencyArgs);
         } else {
+            this.generatorUtils.addImportIfNotExists(utCu, "org.mockito.Mockito.doReturn", true, false);
             return "doReturn(%s).when(%s).%s(%s);".formatted(
                     dependencyResult, dependencyName, dependencyMethodName, dependencyArgs);
         }
     }
 
     // doReturn(<?>).when (or doNothing().when)
-    String getDependencyResult(final MethodExecution compatibleExecution, final CompilationUnit testCompilationUnit) {
-        final InterceptedParam result = compatibleExecution.getResult();
+    public String getDependencyResult(final MethodExecution methodExecution, final CompilationUnit utCu) {
+        final InterceptedParam result = methodExecution.getResult();
         if (Objects.isNull(result)) {
             return null;
         }
         final Object value = result.getValue();
-        return this.processDependencyResultRecursive(value, testCompilationUnit);
+        return this.processDependencyResultRecursive(value, utCu);
     }
 
-    private String processDependencyResultRecursive(final Object value, final CompilationUnit testCompilationUnit) {
+    private String processDependencyResultRecursive(final Object value, final CompilationUnit utCu) {
         final Class<?> clazz = value.getClass();
         if (this.isPrimitiveType(clazz)) {
             return this.getDependencyResultAsBoxedOrPrimitiveType(value);
@@ -91,13 +93,13 @@ public class TestMethodDepsConfigurer {
         } else if (this.isStringType(clazz)) {
             return this.getDependencyResultAsStringType(value);
         } else if (this.isCollection(clazz)) {
-            return this.getDependencyResultAsCollectionType(value, testCompilationUnit);
+            return this.getDependencyResultAsCollectionType(value, utCu);
         } else if (this.isMap(clazz)) {
-            return this.getDependencyResultAsMapType(value, testCompilationUnit);
+            return this.getDependencyResultAsMapType(value, utCu);
         } else if (this.isOptional(clazz)) {
-            return this.getDependencyResultAsOptionalType(value, testCompilationUnit);
+            return this.getDependencyResultAsOptionalType(value, utCu);
         } else {
-            return this.getDependencyResultAsPlainObject(value, testCompilationUnit);
+            return this.getDependencyResultAsPlainObject(value, utCu);
         }
     }
 
@@ -148,16 +150,16 @@ public class TestMethodDepsConfigurer {
         throw new IllegalStateException("Unexpected value: " + value);
     }
 
-    private String getDependencyResultAsCollectionType(final Object value, final CompilationUnit testCompilationUnit) {
+    private String getDependencyResultAsCollectionType(final Object value, final CompilationUnit utCu) {
         final Collection collection = (Collection) value;
         final String simpleName = value.getClass().getSimpleName(); // List, Set...
         final String typeFullName = value.getClass().getName();
-        testCompilationUnit.getImports().add(new ImportDeclaration(typeFullName, false, false));
+        this.generatorUtils.addImportIfNotExists(utCu, typeFullName, false, false);
         if (collection.isEmpty()) {
-            return MOCK_OBJECT_PATTERN.formatted(simpleName);
+            return this.generatorUtils.addInlinedMock(utCu, simpleName);
         } else {
             final Object first = collection.iterator().next();
-            final String innerString = this.processDependencyResultRecursive(first, testCompilationUnit);
+            final String innerString = this.processDependencyResultRecursive(first, utCu);
             if (List.class.isAssignableFrom(value.getClass())) {
                 return "List.of(%s)".formatted(innerString);
             } else if (Set.class.isAssignableFrom(value.getClass())) {
@@ -168,54 +170,56 @@ public class TestMethodDepsConfigurer {
         }
     }
 
-    private String getDependencyResultAsMapType(final Object value, final CompilationUnit testCompilationUnit) {
+    private String getDependencyResultAsMapType(final Object value, final CompilationUnit utCu) {
         final String simpleName = value.getClass().getSimpleName(); // Map
         final Map map = (Map) value;
         if (map.isEmpty()) {
+            utCu.addImport("org.mockito.Mockito.mock", true, false);
             return MOCK_OBJECT_PATTERN.formatted(simpleName);
         } else {
             final Set set = map.entrySet();
             final Map.Entry entry = (Map.Entry) set.iterator().next();
-            final String keyString = this.processDependencyResultRecursive(entry.getKey(), testCompilationUnit);
-            final String valueString = this.processDependencyResultRecursive(entry.getValue(), testCompilationUnit);
+            final String keyString = this.processDependencyResultRecursive(entry.getKey(), utCu);
+            final String valueString = this.processDependencyResultRecursive(entry.getValue(), utCu);
             return "%s.of(%s,%s)".formatted(simpleName, keyString, valueString);
         }
     }
 
-    private String getDependencyResultAsPlainObject(final Object value, final CompilationUnit testCompilationUnit) {
+    private String getDependencyResultAsPlainObject(final Object value, final CompilationUnit utCu) {
         final String simpleName = value.getClass().getSimpleName();
         final String typeFullName = value.getClass().getName();
-        testCompilationUnit.getImports().add(new ImportDeclaration(typeFullName, false, false));
-        return MOCK_OBJECT_PATTERN.formatted(simpleName);
+        this.generatorUtils.addImportIfNotExists(utCu, typeFullName, false, false);
+        return this.generatorUtils.addInlinedMock(utCu, simpleName);
     }
 
-    private String getDependencyArgs(final MethodExecution compatibleExecution) {
+    private String getDependencyArgs(final MethodExecution compatibleExecution, final CompilationUnit utCu) {
         return compatibleExecution.getInputParams().stream()
                 .map(InterceptedParam::getValue)
-                .map(this::normalizeArg)
+                .map(o -> this.normalizeArg(o, utCu))
                 .collect(Collectors.joining(", "));
     }
 
     // TODO in case of primitive?
-    private String normalizeArg(final Object o) {
+    private String normalizeArg(final Object o, final CompilationUnit utCu) {
+        this.generatorUtils.addImportIfNotExists(utCu, "org.mockito.ArgumentMatchers.any", true, false);
         return "any()";
     }
 
     // Match explicit dep or any parent class
-    private String getDependencyName(final CompilationUnit originCompilationUnit,
+    private String getDependencyName(final CompilationUnit originCu,
                                      final MethodExecution compatibleExecution,
                                      final MethodDeclaration originMethod) {
-        return this.getFromClassFields(originCompilationUnit, compatibleExecution)
+        return this.getFromClassFields(originCu, compatibleExecution)
                 .orElseGet(() -> this.getDependencyFromBody(originMethod));
     }
 
-    private Optional<String> getFromClassFields(final CompilationUnit originCompilationUnit,
+    private Optional<String> getFromClassFields(final CompilationUnit originCu,
                                                 final MethodExecution methodExecution) {
-        final Optional<String> hasFieldMatchingExecutionType = originCompilationUnit.getType(0).getFields().stream()
+        final Optional<String> hasFieldMatchingExecutionType = originCu.getType(0).getFields().stream()
                 .filter(field -> this.matchesType(field, methodExecution.getSimpleClassName()))
                 .map(this::getNameAsString)
                 .findFirst();
-        final Optional<String> hasFieldMatchingCrudRepository = originCompilationUnit.getType(0).getFields().stream()
+        final Optional<String> hasFieldMatchingCrudRepository = originCu.getType(0).getFields().stream()
                 .filter(field -> this.matchesCrudRepository(field, methodExecution))
                 .map(this::getNameAsString)
                 .findFirst();
@@ -238,10 +242,11 @@ public class TestMethodDepsConfigurer {
         return hasCrudRepository.isPresent();
     }
 
-    private String getDependencyResultAsOptionalType(final Object value, final CompilationUnit testCompilationUnit) {
+    private String getDependencyResultAsOptionalType(final Object value, final CompilationUnit utCu) {
         final Optional<?> optional = (Optional<?>) value;
         final String typeFullName = value.getClass().getName();
-        testCompilationUnit.getImports().add(new ImportDeclaration(typeFullName, false, false));
+        this.generatorUtils.addImportIfNotExists(utCu, typeFullName, false, false);
+        this.generatorUtils.addImportIfNotExists(utCu, "org.mockito.Mockito.mock", true, false);
         return optional.map(Object::getClass)
                 .map(clazz -> String.format(MOCK_OBJECT_PATTERN, clazz.getSimpleName()))
                 .map(mock -> String.format("Optional.of(%s)", mock))
@@ -281,4 +286,11 @@ public class TestMethodDepsConfigurer {
                 .map(matcher -> matcher.group(1));
         return dependencyFromBody.orElse(null);
     }
+
+    private boolean isCompatibleExecutionsInBody(final MethodExecution exec, final MethodDeclaration originMethod) {
+        final String name = exec.getMethodName();
+        final String declaration = originMethod.getDeclarationAsString();
+        return declaration.contains(name);
+    }
+
 }
